@@ -91,12 +91,13 @@ def generate_spherical_image(center_coordinates, point_cloud, colors, resolution
 
   # Create the mapping between point cloud and image coordinates
   mapping = np.full((resolution_y, resolution_x), -1, dtype=int)
+
   # Assign points to the image pixels
   for i in range(len(translated_points)):
     ix = np.clip(int(x[i]), 0, resolution_x - 1)
     iy = np.clip(int(y[i]), 0, resolution_y - 1)
     if mapping[iy, ix] == -1 or np.linalg.norm(translated_points[i]) < np.linalg.norm(translated_points[mapping[iy, ix]]):
-      mapping[iy, ix] = i
+      mapping[iy, ix] = i    
       image[iy, ix] = colors[i]
 
   return image, mapping

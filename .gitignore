@@ -10,3 +10,5 @@ output/*.tif
 output/*.las
 output/*.xyz
 output/*.asc
+/output
+testtorsh.py
