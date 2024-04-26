@@ -4,12 +4,12 @@ import matplotlib.pyplot as plt
 import cv2
 import laspy
 import trimesh
-
 import torch
 from segment_anything import sam_model_registry
+from segment_anything import SamPredictor
 from segment_anything import SamAutomaticMaskGenerator
 
-def setup(model_name="vit_b", reduce_memory=True):
+def setup(model_name="vit_h", reduce_memory=True):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
     model_version = None
@@ -27,12 +27,13 @@ def setup(model_name="vit_b", reduce_memory=True):
     sam = sam_model_registry[model_name](checkpoint = url)
     sam.to(device = device)
     mask_generator = None
+    predictor = SamPredictor(sam)
     if (reduce_memory == True):
         mask_generator = SamAutomaticMaskGenerator(sam, points_per_batch=16)
     else:
         mask_generator = SamAutomaticMaskGenerator(sam)
 
-    return mask_generator
+    return mask_generator, predictor
 
 # METHODS
 def sam_masks(anns):
@@ -279,3 +280,53 @@ def normalize(x, y, z, minVal=0.0, maxVal=1.0):
     z = remap(z, leastZ, mostZ, minValZ, maxValZ)
 
     return x, y, z
+
+def show_mask(mask, ax):
+    color = np.random.random((1, 3)).tolist()[0]
+    h, w = mask.shape[-2:]
+    #mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+    mask_image = np.ones((mask.shape[0], mask.shape[1], 3))
+    for i in range(3):
+        mask_image[:,:,i] = color[i]
+    return mask_image
+    
+
+# function to visualize and save segmentation
+def visualize_and_save_segmentation(
+    prompt, predictor, query_index, prediction_path, image_data, save_multiple_masks=False):
+
+    input_points, input_labels, input_box = prompt
+
+    print ("function called successfully")
+    # Make predictions using SAM and visualize them
+    masks, scores, _ = predictor.predict(
+        point_coords=input_points,
+        point_labels=input_labels,
+        box=input_box,
+        multimask_output=save_multiple_masks,
+    )
+    masks.shape  # (number_of_masks) x H x W
+    return masks, scores
+    # Save the predicted image
+    print(f"[INFO] saving the predicted image to {prediction_path}...")
+def save_segementation(masks, scores, image_data, prediction_path):
+
+    print ("image shape", np.shape(image_data))
+    plt.figure(figsize=(np.shape(image_data)[1]/72, np.shape(image_data)[0]/72))
+    ax = plt.gca()
+    c_mask=[]
+    # Plot each mask overlay
+    for i, (mask, score) in enumerate(zip(masks, scores)):
+        plt.imshow(image_data.astype(np.float32))
+        mask_image=show_mask(mask, plt.gca())
+        plt.title(f"Mask {i+1}, Score: {score:.3f}", fontsize=18)
+        plt.axis("off")
+        ax.imshow(np.dstack((mask_image, mask*0.8)))
+        c_mask.append(mask_image)
+        print ("mask iterations started, now on", i)
+
+
+    plt.savefig(prediction_path)
+    print ("prediction_image saved")
+    plt.close()
+
